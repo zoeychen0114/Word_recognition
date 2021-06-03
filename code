@@ -1,0 +1,105 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Dec  3 08:58:44 2020
+
+@author: shaoo
+"""
+import random
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+import matplotlib.pyplot as plt
+#%matplotlib inline
+import psutil
+from PIL import Image
+import timeit
+from sklearn import preprocessing
+from sklearn.metrics import confusion_matrix
+import os
+import tensorflow
+from tensorflow.python.keras import layers, models
+from tensorflow.python.keras.preprocessing.image import ImageDataGenerator
+import matplotlib.pyplot as plt
+from tensorflow.python.keras.utils.np_utils import to_categorical
+
+
+dfc_tr = pd.read_csv('chinese_mnist.csv')
+images_tr = np.array([np.asarray(Image.open('data/data/input_%d_%d_%d.jpg'%(x['suite_id'], x['sample_id'], x['code']))) for x in dfc_tr.iloc])
+pd.DataFrame(zip([9,10,100,1000,10000,100000000,0,1,2,3,4,5,6,7,8],dfc_tr['character'].unique()), columns=['value', 'character']).sort_values(by='value')
+dfc_te = pd.read_csv('test.csv')
+images_te = np.array([np.asarray(Image.open('test/input_%d_%d_%d.jpg'%(x['suite_id'], x['sample_id'], x['code']))) for x in dfc_te.iloc])
+pd.DataFrame(zip([9,10,100,1000,10000,100000000,0,1,2,3,4,5,6,7,8],dfc_te['character'].unique()), columns=['value', 'character']).sort_values(by='value')
+
+n=750
+random_indices = random.sample(range(14250), n) 
+xc_tr = images_tr[random_indices]
+xc_tr = xc_tr/255.0
+xc_te = images_te/255.0
+xc_tr = xc_tr.reshape((-1, 64, 64, 1))
+xc_te = xc_te.reshape((-1, 64, 64, 1))
+xc_tr = np.asarray(xc_tr)
+xc_te = np.asarray(xc_te)
+yc_tr = np.array(dfc_tr['value'])
+yc_te = np.array(dfc_te['value'])
+yc_tr = yc_tr[random_indices]
+
+lec = preprocessing.LabelEncoder()
+yc_int=lec.fit_transform(yc_tr)
+yc_tr=to_categorical(yc_int)
+yc_int=lec.fit_transform(yc_te)
+yc_te=to_categorical(yc_int)
+n_cclasses=15
+
+xc_train = xc_tr
+xc_test = xc_te
+yc_train = yc_tr
+yc_test = yc_te
+
+cepochs = 40
+
+modelc = models.Sequential()
+modelc.add(layers.Conv2D(32, kernel_size=3, input_shape=(64, 64, 1), activation='relu', padding='same'))
+modelc.add(layers.Conv2D(32, kernel_size=3, activation='relu', padding='same'))
+modelc.add(layers.MaxPooling2D(2))
+modelc.add(layers.Dropout(0.25))
+
+modelc.add(layers.Conv2D(64, kernel_size=3, activation='relu', padding='same'))
+modelc.add(layers.Conv2D(64, kernel_size=3, activation='relu', padding='same'))
+modelc.add(layers.MaxPooling2D(2))
+modelc.add(layers.Dropout(0.25))
+
+modelc.add(layers.Flatten())
+modelc.add(layers.Dense(256, activation='relu'))
+modelc.add(layers.Dropout(0.5))
+modelc.add(layers.Dense(n_cclasses, activation='softmax'))
+
+modelc.summary()
+
+modelc.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+start = timeit.default_timer()
+historyc = modelc.fit(xc_train, yc_train, epochs=cepochs, validation_split=0.2, batch_size=32)
+stop = timeit.default_timer()
+execution_time = stop - start
+pid = os.getpid()
+py = psutil.Process(pid)
+memoryUse = py.memory_info()[0]/2.**30
+score = modelc.evaluate(xc_test, yc_test, batch_size=32)
+print(score)
+print(execution_time)
+'''
+plt.plot(list(range(iters)), historyc.history['loss'], label='training')
+plt.plot(list(range(iters)), historyc.history['val_loss'], label='validation')
+plt.legend()
+plt.title('loss')
+plt.xlabel('Iterations')
+plt.show()
+
+plt.plot(list(range(cepochs)), historyc.history['accuracy'], label='Traing accuracy')
+plt.plot(list(range(cepochs)), historyc.history['val_accuracy'], label='Validation accuracy')
+plt.title('Accuracy')
+plt.xlabel('Epoches')
+plt.legend()
+plt.show()
+'''
+print(modelc.evaluate(xc_test,  yc_test, verbose=2))
